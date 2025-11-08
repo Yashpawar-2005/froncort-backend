@@ -1,10 +1,20 @@
 import { PrismaClient } from "./generated/prisma/client";
-const client = new PrismaClient();
 import { Worker } from "bullmq";
 import IORedis from "ioredis";
 import dotenv from 'dotenv';
 import nodemailer from 'nodemailer'
 dotenv.config();
+
+// Singleton pattern for Prisma Client
+declare global {
+  var prisma: PrismaClient | undefined;
+}
+
+const client = global.prisma || new PrismaClient();
+
+if (process.env.NODE_ENV !== 'production') {
+  global.prisma = client;
+}
 
 const connection = new IORedis(process.env.REDIS_URL || "redis://127.0.0.1:6379", {
   maxRetriesPerRequest: null,
