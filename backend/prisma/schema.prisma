@@ -1,0 +1,158 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = "postgresql://postgres:postgres@localhost:5432/mydb?schema=public"
+}
+
+model User {
+  id              Int             @id @default(autoincrement())
+  email           String          @unique
+  username        String          @unique
+  password        String
+  ownedProjects   Project[]       @relation("OwnedProjects")
+  memberships     ProjectMember[]
+  logs            Log[]           @relation("UserLogs")
+  createdLogs     Log[]           @relation("CreatedLogs")
+  createdCards    Card[]          @relation("CreatedCards")
+  cardAssignments CardAssignee[]
+}
+
+model Project {
+  id           Int             @id @default(autoincrement())
+  name         String
+  createdAt    DateTime        @default(now())
+  owner        User            @relation("OwnedProjects", fields: [ownerId], references: [id])
+  ownerId      Int
+  members      ProjectMember[]
+  kanbanboard  Kanbanboard?
+  pageVersions pageVersion[]
+  pages        Page[]
+  Log          Log[]
+  updatedAt    DateTime        @default(now())
+}
+
+model ProjectMember {
+  id          Int     @id @default(autoincrement())
+  role        Role
+  title       String
+  description String?
+  user        User    @relation(fields: [userId], references: [id])
+  userId      Int
+  project     Project @relation(fields: [projectId], references: [id])
+  projectId   Int
+
+  @@unique([userId, projectId])
+}
+
+enum Role {
+  OWNER
+  ADMIN
+  EDITOR
+  VIEWER
+}
+
+model Kanbanboard {
+  id        Int      @id @default(autoincrement())
+  project   Project  @relation(references: [id], fields: [projectId])
+  projectId Int      @unique
+  cards     Card[]
+  count     Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Page {
+  id          Int           @id @default(autoincrement())
+  title       String
+  // content   String?
+  pageVersion pageVersion[]
+  project     Project       @relation(fields: [projectId], references: [id])
+  projectId   Int
+}
+
+model pageVersion {
+  id           Int     @id @default(autoincrement())
+  version      Int     @default(1)
+  content      Bytes?
+  uniqueString String  @unique
+  count        Int @default(0)
+  project      Project @relation(fields: [projectId], references: [id])
+  projectId    Int
+  pageid       Int
+  page         Page    @relation(fields: [pageid], references: [id])
+  updates     updates[]
+  createdAt  DateTime @default(now())
+}
+model updates{
+  id Int @unique @id @default(autoincrement())
+  diffContent Bytes?
+  belongs_to_pageVersion  pageVersion @relation(fields: [belongs_to_pageVersionId],references: [id])
+  belongs_to_pageVersionId Int
+  what_count Int
+  createdAt DateTime @default(now())
+}
+
+model Log {
+  id              Int      @id @default(autoincrement())
+  message         String
+  kanbanId        Int?
+  docId           Int?
+  createdAt       DateTime @default(now())
+  project         Project? @relation(fields: [projectid], references: [id])
+  projectid       Int?
+  user            User?    @relation("UserLogs", fields: [userId], references: [id])
+  userId          Int?
+  createdByUser   User     @relation("CreatedLogs", fields: [createdByUserId], references: [id])
+  createdByUserId Int
+}
+
+model Card {
+  id            Int            @id @default(autoincrement())
+  title         String
+  description   String?
+  priority      Priority       @default(MODERATE)
+  label         String         @default("general")
+  dueDate       DateTime?
+  attachedPages Int[]          @default([])
+  column        ColumnType     @default(TODO)
+  board         Kanbanboard    @relation(fields: [boardId], references: [id])
+  boardId       Int
+  creator       User           @relation("CreatedCards", fields: [creatorId], references: [id])
+  creatorId     Int
+  assignees     CardAssignee[]
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+}
+
+model CardAssignee {
+  id         Int      @id @default(autoincrement())
+  card       Card     @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  cardId     Int
+  user       User     @relation(fields: [userId], references: [id])
+  userId     Int
+  assignedAt DateTime @default(now())
+
+  @@unique([cardId, userId])
+}
+
+enum Priority {
+  URGENT
+  MODERATE
+  RELAXED
+}
+
+enum ColumnType {
+  TODO
+  IN_PROGRESS
+  DONE
+}
