@@ -5,6 +5,10 @@ set -e
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$ROOT"
 
+echo "==> Clearing old build files (dist)..."
+rm -rf "$ROOT/backend/dist"
+rm -rf "$ROOT/updatedocs/dist"
+
 echo "==> Starting Redis via Docker..."
 docker compose up -d redis
 
@@ -13,7 +17,7 @@ echo "==> Syncing .env to backend and updatedocs..."
 cp "$ROOT/.env" "$ROOT/backend/.env"
 cp "$ROOT/.env" "$ROOT/updatedocs/.env"
 
-echo "==> Installing & building backend (API)..."
+echo "==> [1/2] Installing & building backend (API)..."
 cd "$ROOT/backend"
 npm install
 npm run build
@@ -21,17 +25,18 @@ npm run build
 echo "==> Running Prisma migrations..."
 npx prisma migrate deploy
 
-echo "==> Installing & building updatedocs (Workers)..."
+echo "==> [2/2] Installing & building updatedocs (Workers)..."
 cd "$ROOT/updatedocs"
 npm install
 npm run build
 
-echo "==> Starting/Reloading PM2..."
+echo "==> Restarting PM2 processes..."
 cd "$ROOT"
-pm2 start ecosystem.config.js || pm2 reload ecosystem.config.js
+# restart will completely kill and start the processes fresh
+pm2 restart ecosystem.config.js || pm2 start ecosystem.config.js
 pm2 save
 
 echo ""
-echo "✅ Deployment complete!"
+echo "✅ Clean deployment complete!"
 echo "📋 Run 'pm2 list' to see process status."
 echo "📜 Run 'pm2 logs' to monitor both processes."
